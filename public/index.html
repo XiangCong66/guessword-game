@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5eddf">
+  <meta name="description" content="两个人各自用设备输入，看看何时想到同一个词。">
+  <title>撞词计划 · 双人在线默契游戏</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="撞词计划首页">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 25 25" fill="none">
+            <path d="M7.1 5.2H16a3 3 0 0 1 3 3v2.5a3 3 0 0 1-3 3H7.1a3 3 0 0 1-3-3V8.2a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M6.2 15.7h7.3a2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5H9.3l-2.9 1.7.5-1.9a2.5 2.5 0 0 1-.7-2.3v-2.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/>
+            <circle cx="7.4" cy="9.5" r="1" fill="currentColor"/>
+            <circle cx="10.9" cy="9.5" r="1" fill="currentColor"/>
+            <circle cx="14.4" cy="9.5" r="1" fill="currentColor"/>
+          </svg>
+        </span>
+        <span>
+          <span class="eyebrow">FRIEND WORD · ONLINE</span>
+          撞词计划
+        </span>
+      </a>
+      <div class="server-state" id="serverState">
+        <span class="server-dot" aria-hidden="true"></span>
+        <span>正在连接</span>
+      </div>
+    </header>
+
+    <section class="lobby" id="lobbyScreen">
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="hero-kicker">两个人，两块屏幕</p>
+          <h1>哪怕隔着屏幕，<br>也会<span>想到一起。</span></h1>
+          <p class="hero-lead">各自写下一个词，提交后再一起揭晓。没有提示，也不能偷看，只靠你们之间的默契。</p>
+        </div>
+        <div class="orbit-art" aria-hidden="true">
+          <span class="orbit orbit-one"></span>
+          <span class="orbit orbit-two"></span>
+          <span class="orbit-word word-a">海</span>
+          <span class="orbit-word word-b">风</span>
+          <span class="orbit-center">?</span>
+        </div>
+      </div>
+
+      <div class="lobby-grid">
+        <section class="lobby-card create-card" aria-labelledby="createTitle">
+          <div class="card-number">01</div>
+          <p class="section-kicker">START A ROOM</p>
+          <h2 id="createTitle">发起一场</h2>
+          <p>创建房间后会得到一扇专属的默契传送门，把链接发给朋友即可。</p>
+          <button class="primary-button" id="createRoomButton" type="button">
+            <span>创建房间</span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h13M14 7l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </section>
+
+        <section class="lobby-card join-card" aria-labelledby="joinTitle">
+          <div class="card-number">02</div>
+          <p class="section-kicker">JOIN A FRIEND</p>
+          <h2 id="joinTitle">加入朋友</h2>
+          <p>已经收到邀请？输入六位房间号，坐到另一位玩家的对面。</p>
+          <form class="join-form" id="joinForm" novalidate>
+            <label for="roomCodeInput">房间号</label>
+            <div class="join-row">
+              <input
+                id="roomCodeInput"
+                name="roomCode"
+                type="text"
+                maxlength="6"
+                autocomplete="off"
+                spellcheck="false"
+                inputmode="text"
+                placeholder="6 位房间号"
+                aria-describedby="lobbyMessage"
+              >
+              <button class="secondary-button" id="joinRoomButton" type="submit">加入</button>
+            </div>
+          </form>
+          <p class="form-message" id="lobbyMessage" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+
+      <section class="how-it-works" aria-label="游戏方式">
+        <p><span>1</span> 创建或加入同一个房间</p>
+        <i aria-hidden="true"></i>
+        <p><span>2</span> 两边各自输入一个词</p>
+        <i aria-hidden="true"></i>
+        <p><span>3</span> 同时提交，相同即胜利</p>
+      </section>
+    </section>
+
+    <section class="online-game" id="gameScreen" hidden>
+      <div class="game-heading">
+        <div>
+          <p class="hero-kicker" id="playerLabel">你是玩家 A</p>
+          <h1>第 <span id="roundNumber">01</span> 回合</h1>
+        </div>
+        <div class="room-actions">
+          <div class="room-ticket">
+            <span>房间</span>
+            <strong id="roomCode">------</strong>
+          </div>
+          <button class="invite-button" id="copyInviteButton" type="button">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 8.5V7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5M15 15v2a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            复制邀请
+          </button>
+        </div>
+      </div>
+
+      <section class="game-shell" aria-label="双人联网撞词游戏">
+        <div class="game-toolbar">
+          <div class="live-status" aria-live="polite">
+            <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+            <span id="statusText">正在进入房间…</span>
+          </div>
+          <div class="connection-label" id="connectionLabel">
+            <span></span>
+            实时连接
+          </div>
+        </div>
+
+        <div class="players">
+          <article class="player-card player-a" id="playerCardA" data-player="A">
+            <div class="player-heading">
+              <span class="player-badge" aria-hidden="true">A</span>
+              <div>
+                <h2>玩家 A</h2>
+                <p id="playerNoteA">正在等待加入</p>
+              </div>
+              <span class="presence" id="presenceA">未加入</span>
+            </div>
+            <form class="answer-form" id="formA" novalidate>
+              <label class="answer-label" for="answerA">
+                <span id="answerLabelA">A 的词</span>
+                <span id="wordStateA">等待中</span>
+              </label>
+              <input class="answer-input" id="answerA" type="text" maxlength="20" autocomplete="off" placeholder="等待玩家加入" aria-describedby="statusText">
+              <button class="submit-button" id="submitA" type="submit" disabled>
+                <span>提交这个词</span>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m4 12 15-7-4.2 15-3.1-6.1L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </form>
+          </article>
+
+          <div class="versus" aria-hidden="true"><span>VS</span></div>
+
+          <article class="player-card player-b" id="playerCardB" data-player="B">
+            <div class="player-heading">
+              <span class="player-badge" aria-hidden="true">B</span>
+              <div>
+                <h2>玩家 B</h2>
+                <p id="playerNoteB">正在等待加入</p>
+              </div>
+              <span class="presence" id="presenceB">未加入</span>
+            </div>
+            <form class="answer-form" id="formB" novalidate>
+              <label class="answer-label" for="answerB">
+                <span id="answerLabelB">B 的词</span>
+                <span id="wordStateB">等待中</span>
+              </label>
+              <input class="answer-input" id="answerB" type="text" maxlength="20" autocomplete="off" placeholder="等待玩家加入" aria-describedby="statusText">
+              <button class="submit-button" id="submitB" type="submit" disabled>
+                <span>提交这个词</span>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m4 12 15-7-4.2 15-3.1-6.1L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </form>
+          </article>
+        </div>
+
+        <div class="game-footer">
+          <p>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M8 10V7.8a4 4 0 0 1 8 0V10M6 10h12v9H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            </svg>
+            提交后答案会立刻封存，对方提交前无法看到。
+          </p>
+          <span>已揭晓 <strong id="completedRounds">0</strong> 回合</span>
+        </div>
+      </section>
+
+      <section class="history-section" aria-labelledby="historyTitle">
+        <div>
+          <p class="section-kicker">MEMORY LOG</p>
+          <h2 id="historyTitle">默契记录</h2>
+        </div>
+        <div class="history-list" id="historyList">
+          <span class="history-empty">还没有揭晓记录。</span>
+        </div>
+      </section>
+    </section>
+
+    <footer class="site-footer">
+      <span>不用注册 · 只为两个人的默契</span>
+      <a href="/">撞词计划</a>
+    </footer>
+  </main>
+
+  <dialog id="roundDialog" aria-labelledby="roundDialogTitle" aria-describedby="roundDialogDescription">
+    <div class="dialog-content">
+      <p class="dialog-kicker" id="roundDialogKicker">ROUND 01 · NO MATCH</p>
+      <h2 id="roundDialogTitle">还没想到一起</h2>
+      <p class="dialog-description" id="roundDialogDescription">两个词擦肩而过。看看彼此想到了什么，再继续下一回合。</p>
+      <div class="compare-words" aria-label="本回合答案">
+        <div class="compare-word player-a-word">
+          <small>玩家 A</small>
+          <strong id="resultWordA">—</strong>
+        </div>
+        <div class="compare-icon" aria-hidden="true">≠</div>
+        <div class="compare-word player-b-word">
+          <small>玩家 B</small>
+          <strong id="resultWordB">—</strong>
+        </div>
+      </div>
+      <button class="dialog-button" id="nextRoundButton" type="button">继续下一回合</button>
+      <p class="dialog-hint">任意一方点击后，两边会同时进入下一回合</p>
+    </div>
+  </dialog>
+
+  <dialog id="winDialog" aria-labelledby="winDialogTitle" aria-describedby="winDialogDescription">
+    <div class="dialog-content win-content">
+      <div class="win-burst" aria-hidden="true">✓</div>
+      <p class="dialog-kicker">YOU THOUGHT THE SAME</p>
+      <h2 id="winDialogTitle">想到一起了！</h2>
+      <div class="win-word" id="winWord">默契</div>
+      <p class="dialog-description" id="winDialogDescription">你们成功撞词。</p>
+      <button class="dialog-button" id="playAgainButton" type="button">两边再玩一局</button>
+      <p class="dialog-hint">重新开始会清空本局记录</p>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+</body>
+</html>
