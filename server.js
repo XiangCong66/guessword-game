@@ -137,7 +137,12 @@ function createRoom() {
       B: null
     },
     history: [],
-    result: null
+    result: null,
+    chat: [],
+    chatTimes: {
+      A: [],
+      B: []
+    }
   };
 
   rooms.set(roomId, room);
@@ -189,7 +194,8 @@ function publicState(room) {
       }
     },
     result: room.result,
-    history: room.history
+    history: room.history,
+    chat: room.chat
   };
 }
 
@@ -287,7 +293,7 @@ async function handleApi(request, response, requestUrl) {
     return;
   }
 
-  const roomMatch = requestUrl.pathname.match(/^\/api\/rooms\/([A-Z0-9]{6})(?:\/(join|answers|next|restart|events))?$/);
+  const roomMatch = requestUrl.pathname.match(/^\/api\/rooms\/([A-Z0-9]{6})(?:\/(join|answers|chat|next|restart|events))?$/);
   if (!roomMatch) {
     sendError(response, 404, "接口不存在", "NOT_FOUND");
     return;
@@ -403,6 +409,43 @@ async function handleApi(request, response, requestUrl) {
     return;
   }
 
+  if (action === "chat") {
+    const text = typeof body.text === "string"
+      ? body.text.trim().replace(/\s+/g, " ")
+      : "";
+
+    if (!text) {
+      sendError(response, 400, "请输入聊天内容", "EMPTY_CHAT");
+      return;
+    }
+    if ([...text].length > 200) {
+      sendError(response, 400, "聊天内容不能超过 200 个字符", "CHAT_TOO_LONG");
+      return;
+    }
+
+    const now = Date.now();
+    room.chatTimes[player] = room.chatTimes[player].filter((time) => now - time < 5000);
+    if (room.chatTimes[player].length >= 5) {
+      sendError(response, 429, "消息发得太快了，请稍等几秒", "CHAT_RATE_LIMIT");
+      return;
+    }
+    room.chatTimes[player].push(now);
+    room.chat.push({
+      id: crypto.randomUUID(),
+      player,
+      text,
+      time: now
+    });
+    if (room.chat.length > 50) {
+      room.chat.splice(0, room.chat.length - 50);
+    }
+
+    room.updatedAt = now;
+    broadcastState(room);
+    sendJson(response, 200, publicState(room));
+    return;
+  }
+
   if (action === "next") {
     if (room.phase !== "resolved") {
       sendError(response, 409, "当前不能进入下一回合", "ROUND_NOT_RESOLVED");
@@ -434,6 +477,11 @@ async function handleApi(request, response, requestUrl) {
       B: null
     };
     room.history = [];
+    room.chat = [];
+    room.chatTimes = {
+      A: [],
+      B: []
+    };
     room.result = null;
     room.phase = "playing";
     room.updatedAt = Date.now();

@@ -57,6 +57,11 @@
       document.getElementById("submitA"),
       document.getElementById("submitB")
     ],
+    chatMessages: document.getElementById("chatMessages"),
+    chatForm: document.getElementById("chatForm"),
+    chatInput: document.getElementById("chatInput"),
+    chatSendButton: document.getElementById("chatSendButton"),
+    chatStatus: document.getElementById("chatStatus"),
     historyList: document.getElementById("historyList"),
     roundDialog: document.getElementById("roundDialog"),
     roundDialogKicker: document.getElementById("roundDialogKicker"),
@@ -79,9 +84,12 @@
     networkUrls: [],
     toastTimer: null,
     submitting: false,
+    sendingChat: false,
     celebratedRound: null,
     lastRound: null,
-    lastPhase: null
+    lastPhase: null,
+    lastChatKey: "",
+    chatInitialized: false
   };
 
   function normalizeCode(value) {
@@ -467,6 +475,82 @@
     });
   }
 
+  function formatChatTime(timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    return date.toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+  }
+
+  function renderChat(messages) {
+    const chatMessages = Array.isArray(messages) ? messages : [];
+    const chatKey = chatMessages.map((message) => message.id).join("|");
+    if (app.chatInitialized && app.lastChatKey === chatKey) {
+      return;
+    }
+
+    const wasNearBottom = !app.chatInitialized ||
+      elements.chatMessages.scrollHeight - elements.chatMessages.scrollTop - elements.chatMessages.clientHeight < 48;
+    elements.chatMessages.replaceChildren();
+
+    if (chatMessages.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "chat-empty";
+      empty.textContent = "还没有消息，打个招呼吧。";
+      elements.chatMessages.appendChild(empty);
+    } else {
+      chatMessages.forEach((message) => {
+        const item = document.createElement("article");
+        const avatar = document.createElement("span");
+        const content = document.createElement("div");
+        const meta = document.createElement("div");
+        const player = document.createElement("strong");
+        const time = document.createElement("time");
+        const text = document.createElement("p");
+        const isOwn = app.session && app.session.player === message.player;
+
+        item.className = "chat-message" + (isOwn ? " is-own" : "");
+        avatar.className = "chat-avatar";
+        avatar.textContent = message.player;
+        content.className = "chat-message-content";
+        meta.className = "chat-message-meta";
+        player.textContent = "玩家 " + message.player;
+        time.dateTime = new Date(message.time).toISOString();
+        time.textContent = formatChatTime(message.time);
+        text.textContent = message.text;
+        meta.append(player, time);
+        content.append(meta, text);
+        item.append(avatar, content);
+        elements.chatMessages.appendChild(item);
+      });
+    }
+
+    if (wasNearBottom) {
+      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    }
+    app.lastChatKey = chatKey;
+    app.chatInitialized = true;
+  }
+
+  function renderChatControls(roomState) {
+    const canChat = Boolean(app.session && roomState && roomState.players[app.session.player]?.joined);
+    elements.chatInput.disabled = !canChat || app.sendingChat;
+    elements.chatSendButton.disabled = !canChat || app.sendingChat;
+
+    if (!canChat) {
+      elements.chatStatus.textContent = "连接房间后可以发送消息";
+    } else if (!roomState.players.B?.joined) {
+      elements.chatStatus.textContent = "朋友加入后，消息会在同一房间同步";
+    } else {
+      elements.chatStatus.textContent = "按回车发送 · 仅本房间可见";
+    }
+  }
+
   function closeRoundDialog() {
     if (elements.roundDialog.open) {
       elements.roundDialog.close();
@@ -537,6 +621,8 @@
 
     renderPlayers(roomState);
     renderHistory(roomState.history);
+    renderChat(roomState.chat);
+    renderChatControls(roomState);
 
     if (roomState.phase === "resolved" && roomState.result && !roomState.result.isMatch) {
       showRoundResult(roomState);
@@ -629,6 +715,42 @@
     } catch (error) {
       elements.nextRoundButton.disabled = false;
       showToast(error.message);
+    }
+  }
+
+  async function sendChat() {
+    if (app.sendingChat || !app.session || !app.room) {
+      return;
+    }
+
+    const text = elements.chatInput.value.trim();
+    if (!text) {
+      elements.chatInput.focus();
+      showToast("先输入聊天内容");
+      return;
+    }
+
+    app.sendingChat = true;
+    renderChatControls(app.room);
+    try {
+      const payload = await request(
+        "/api/rooms/" + encodeURIComponent(app.session.roomId) + "/chat",
+        {
+          method: "POST",
+          body: {
+            token: app.session.token,
+            text
+          }
+        }
+      );
+      elements.chatInput.value = "";
+      applyState(payload);
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      app.sendingChat = false;
+      renderChatControls(app.room);
+      elements.chatInput.focus();
     }
   }
 
@@ -763,6 +885,10 @@
   });
 
   elements.copyInviteButton.addEventListener("click", copyInvite);
+  elements.chatForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendChat();
+  });
   elements.nextRoundButton.addEventListener("click", nextRound);
   elements.playAgainButton.addEventListener("click", restartGame);
 

@@ -193,6 +193,38 @@
         </div>
       </section>
 
+      <section class="chat-section" aria-labelledby="chatTitle">
+        <div class="chat-heading">
+          <p class="section-kicker">ROOM CHAT</p>
+          <h2 id="chatTitle">房间对话</h2>
+          <p>消息只在本房间同步，两位玩家都能看到。</p>
+        </div>
+        <div class="chat-panel">
+          <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-relevant="additions">
+            <p class="chat-empty">还没有消息，打个招呼吧。</p>
+          </div>
+          <form class="chat-form" id="chatForm" novalidate>
+            <label class="sr-only" for="chatInput">聊天内容</label>
+            <input
+              id="chatInput"
+              type="text"
+              maxlength="200"
+              autocomplete="off"
+              enterkeyhint="send"
+              placeholder="和朋友说点什么…"
+              disabled
+            >
+            <button id="chatSendButton" type="submit" disabled>
+              发送
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m4 12 15-7-4.2 15-3.1-6.1L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </form>
+          <p class="chat-status" id="chatStatus" role="status">连接房间后可以发送消息</p>
+        </div>
+      </section>
+
       <section class="history-section" aria-labelledby="historyTitle">
         <div>
           <p class="section-kicker">MEMORY LOG</p>
