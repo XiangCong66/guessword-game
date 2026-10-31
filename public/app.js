@@ -243,10 +243,10 @@
     try {
       const health = await request("/api/health");
       app.networkUrls = Array.isArray(health.networkUrls) ? health.networkUrls : [];
-      if (health.ai?.provider === "glm") {
+      if (health.ai?.provider === "deepseek") {
         elements.aiModeHint.textContent = health.ai.configured
-          ? "GLM 在线出题，根据提示猜中隐藏词"
-          : "未配置 GLM 密钥，将使用本地备用主题";
+          ? "DeepSeek 在线出题，根据提示猜中隐藏词"
+          : "未配置 DeepSeek 密钥，将使用本地备用主题";
       }
       setServerConnection("online", "服务器正常");
     } catch {
@@ -351,7 +351,7 @@
     setButtonBusy(
       elements.createRoomButton,
       true,
-      mode === "theme" ? "GLM 正在出题…" : "正在创建…"
+      mode === "theme" ? "DeepSeek 正在出题…" : "正在创建…"
     );
     setLobbyMessage("");
 
@@ -431,7 +431,7 @@
     }
 
     if (roomState.phase === "judging") {
-      return "双方答案已封存，GLM 正在判断谁更接近主题";
+      return "双方答案已封存，DeepSeek 正在判断谁更接近主题";
     }
 
     if (roomState.phase === "resolved") {
@@ -475,12 +475,12 @@
     if (roomState.phase === "won" && roomState.theme.target) {
       elements.themeSource.textContent = "主题：" + roomState.theme.target;
       elements.themeHelp.textContent = "隐藏主题已经揭晓，本局结果已保存到往期对局。";
-    } else if (roomState.theme.source === "glm") {
-      elements.themeSource.textContent = "GLM 保密出题";
-      elements.themeHelp.textContent = "双方各猜一个词。猜中隐藏主题后，由 GLM 按语义接近度判定胜者。";
+    } else if (roomState.theme.source === "deepseek") {
+      elements.themeSource.textContent = "DeepSeek 保密出题";
+      elements.themeHelp.textContent = "双方各猜一个词。猜中隐藏主题后，由 DeepSeek 按语义接近度判定胜者。";
     } else {
       elements.themeSource.textContent = "备用主题";
-      elements.themeHelp.textContent = "GLM 暂未连接，当前使用备用主题；猜中隐藏主题后仍会进行接近度判定。";
+      elements.themeHelp.textContent = "DeepSeek 暂未连接，当前使用备用主题；猜中隐藏主题后仍会进行接近度判定。";
     }
   }
 

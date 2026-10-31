@@ -17,9 +17,9 @@ const globalChat = [];
 const globalChatTimes = new Map();
 const MAX_GLOBAL_CHAT_MESSAGES = 100;
 const MAX_MATCH_HISTORY = 8;
-const GLM_API_KEY = process.env.GLM_API_KEY || "";
-const GLM_MODEL = process.env.GLM_MODEL || "glm-4.7-flash";
-const GLM_API_URL = process.env.GLM_API_URL || "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-flash";
+const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/chat/completions";
 
 const FALLBACK_THEMES = [
   { target: "海风", clue: "来自辽阔水面，带着盐和远方的气息", category: "自然" },
@@ -153,19 +153,19 @@ function extractJsonObject(text) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
-async function callGlm(messages, options = {}) {
-  if (!GLM_API_KEY) {
-    throw new Error("未配置 GLM_API_KEY");
+async function callDeepSeek(messages, options = {}) {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error("未配置 DEEPSEEK_API_KEY");
   }
 
-  const response = await fetch(GLM_API_URL, {
+  const response = await fetch(DEEPSEEK_API_URL, {
     method: "POST",
     headers: {
-      "Authorization": "Bearer " + GLM_API_KEY,
+      "Authorization": "Bearer " + DEEPSEEK_API_KEY,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: GLM_MODEL,
+      model: DEEPSEEK_MODEL,
       messages,
       temperature: options.temperature ?? 0.4,
       max_tokens: options.maxTokens ?? 300
@@ -177,17 +177,17 @@ async function callGlm(messages, options = {}) {
   try {
     payload = await response.json();
   } catch {
-    throw new Error("GLM 返回了无法解析的内容");
+    throw new Error("DeepSeek 返回了无法解析的内容");
   }
 
   if (!response.ok) {
-    const message = payload?.error?.message || payload?.message || "GLM 请求失败";
+    const message = payload?.error?.message || payload?.message || "DeepSeek 请求失败";
     throw new Error(message);
   }
 
   const content = payload?.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
-    throw new Error("GLM 没有返回可用内容");
+    throw new Error("DeepSeek 没有返回可用内容");
   }
   return content;
 }
@@ -205,12 +205,12 @@ function fallbackTheme() {
 }
 
 async function generateTheme() {
-  if (!GLM_API_KEY) {
+  if (!DEEPSEEK_API_KEY) {
     return fallbackTheme();
   }
 
   try {
-    const content = await callGlm([
+    const content = await callDeepSeek([
       {
         role: "system",
         content: "你是中文双人猜词游戏的出题器。只输出合法 JSON，不要使用 Markdown。"
@@ -241,10 +241,10 @@ async function generateTheme() {
       target,
       clue,
       category: category.slice(0, 10),
-      source: "glm"
+      source: "deepseek"
     };
   } catch (error) {
-    console.warn("GLM 主题生成失败，使用本地备用主题:", error.message);
+    console.warn("DeepSeek 主题生成失败，使用本地备用主题:", error.message);
     return fallbackTheme();
   }
 }
@@ -279,11 +279,11 @@ async function judgeThemeGuesses(theme, answerA, answerB) {
   const exactB = answerB === theme.target;
   let judgement;
 
-  if (!GLM_API_KEY) {
+  if (!DEEPSEEK_API_KEY) {
     judgement = fallbackCloseness(theme, answerA, answerB);
   } else {
     try {
-      const content = await callGlm([
+      const content = await callDeepSeek([
         {
           role: "system",
           content: "你是严格、简洁的中文语义裁判。只输出合法 JSON，不要使用 Markdown。"
@@ -321,10 +321,10 @@ async function judgeThemeGuesses(theme, answerA, answerB) {
         explanation: typeof parsed.explanation === "string"
           ? parsed.explanation.trim().slice(0, 80)
           : "AI 已完成语义比较。",
-        source: "glm"
+        source: "deepseek"
       };
     } catch (error) {
-      console.warn("GLM 语义评分失败，使用本地估算:", error.message);
+      console.warn("DeepSeek 语义评分失败，使用本地估算:", error.message);
       judgement = fallbackCloseness(theme, answerA, answerB);
     }
   }
@@ -586,9 +586,9 @@ async function handleApi(request, response, requestUrl) {
       uptime: Math.round(process.uptime()),
       networkUrls: getNetworkUrls(),
       ai: {
-        provider: "glm",
-        configured: Boolean(GLM_API_KEY),
-        model: GLM_MODEL
+        provider: "deepseek",
+        configured: Boolean(DEEPSEEK_API_KEY),
+        model: DEEPSEEK_MODEL
       }
     });
     return;
