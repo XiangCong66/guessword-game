@@ -347,6 +347,69 @@ a:focus-visible {
   line-height: 1.75;
 }
 
+.mode-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  padding: 0;
+  margin: 0 0 20px;
+  border: 0;
+}
+
+.mode-picker legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.mode-picker label {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.mode-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.mode-picker label > span {
+  display: flex;
+  min-height: 67px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 253, 248, 0.7);
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.mode-picker label > span strong {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.mode-picker label > span small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.mode-picker input:checked + span {
+  border-color: var(--ink);
+  background: var(--sun-soft, #fff1b8);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.mode-picker input:focus-visible + span {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .primary-button,
 .secondary-button,
 .invite-button {
@@ -532,6 +595,65 @@ a:focus-visible {
   font-family: "Courier New", monospace;
   font-size: 0.7em;
   letter-spacing: -0.06em;
+}
+
+.theme-card {
+  margin-bottom: 17px;
+  padding: 18px 21px;
+  border: 1.5px solid var(--ink);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(33, 143, 132, 0.14), transparent 42%),
+    linear-gradient(135deg, #fff9e7, #eff9f4);
+  box-shadow: 0 4px 0 rgba(23, 56, 74, 0.08);
+}
+
+.theme-card-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+}
+
+.theme-icon {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--sun);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 18px;
+}
+
+.theme-card .section-kicker {
+  margin: 0 0 4px;
+}
+
+.theme-card h2 {
+  margin: 0;
+  font-family: "STSong", "Songti SC", serif;
+  font-size: clamp(19px, 3vw, 25px);
+  line-height: 1.35;
+}
+
+.theme-source {
+  padding: 6px 9px;
+  border: 1px solid rgba(33, 143, 132, 0.28);
+  border-radius: 999px;
+  color: #176f66;
+  background: rgba(255, 250, 241, 0.72);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.theme-help {
+  margin: 11px 0 0 52px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
 }
 
 .room-actions {
@@ -921,6 +1043,45 @@ a:focus-visible {
   line-height: 1.65;
 }
 
+.chat-tabs,
+.history-tabs {
+  display: flex;
+  gap: 5px;
+  margin-top: 13px;
+}
+
+.chat-tabs button,
+.history-tabs button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 250, 241, 0.7);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chat-tabs button[aria-selected="true"],
+.history-tabs button[aria-selected="true"] {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--sun);
+}
+
+.history-tabs button span {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 3px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(23, 56, 74, 0.1);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+}
+
 .chat-panel {
   min-width: 0;
 }
@@ -1080,6 +1241,10 @@ a:focus-visible {
   font-size: 8px;
 }
 
+.history-panels {
+  min-width: 0;
+}
+
 .history-section {
   display: grid;
   grid-template-columns: 205px minmax(0, 1fr);
@@ -1130,6 +1295,18 @@ a:focus-visible {
   background: var(--teal-pale);
 }
 
+.history-chip.is-theme {
+  border-color: rgba(241, 200, 87, 0.8);
+  background: #fff9df;
+}
+
+.history-target {
+  padding-left: 4px;
+  border-left: 1px solid var(--line);
+  color: var(--teal);
+  font-size: 8px;
+}
+
 .history-chip small {
   color: var(--muted);
   font-family: "Courier New", monospace;
@@ -1142,6 +1319,65 @@ a:focus-visible {
   max-width: 120px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.matches-list {
+  display: grid;
+  gap: 8px;
+}
+
+.match-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 253, 248, 0.82);
+}
+
+.match-card > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.match-card > div strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-card > div span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-card > span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--paper-deep);
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.match-card > button {
+  min-height: 33px;
+  padding: 5px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 dialog {
@@ -1189,6 +1425,17 @@ dialog::backdrop {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.7;
+}
+
+.round-feedback {
+  margin: -5px 0 20px;
+  padding: 10px 12px;
+  border: 1px solid rgba(241, 200, 87, 0.75);
+  border-radius: 11px;
+  color: var(--ink);
+  background: #fff9df;
+  font-size: 10px;
+  line-height: 1.6;
 }
 
 .compare-words {
@@ -1267,6 +1514,19 @@ dialog::backdrop {
   cursor: wait;
 }
 
+.dialog-button.secondary {
+  background: var(--surface);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 9px;
+}
+
+.dialog-actions .dialog-button {
+  flex: 1;
+}
+
 .dialog-hint {
   margin: 12px 0 0;
   color: var(--muted);
@@ -1333,8 +1593,139 @@ dialog::backdrop {
   overflow-wrap: anywhere;
 }
 
-.win-content .dialog-button {
-  max-width: 250px;
+.win-verdict {
+  display: inline-flex;
+  margin: -4px auto 18px;
+  padding: 8px 13px;
+  border: 1px solid rgba(33, 143, 132, 0.35);
+  border-radius: 999px;
+  color: #176f66;
+  background: var(--teal-pale);
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.win-content .dialog-actions {
+  max-width: 410px;
+  margin: 0 auto;
+}
+
+#matchDialog {
+  width: min(680px, calc(100% - 28px));
+}
+
+.match-dialog-content {
+  max-height: min(82vh, 760px);
+  padding: 30px;
+  overflow-y: auto;
+}
+
+.match-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.match-dialog-head .dialog-description {
+  margin-bottom: 18px;
+}
+
+.dialog-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.match-rounds {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.archived-round {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 253, 248, 0.82);
+}
+
+.archived-round.is-final {
+  border-color: rgba(33, 143, 132, 0.55);
+  background: var(--teal-pale);
+}
+
+.archived-round > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.archived-round > div strong {
+  color: var(--muted);
+  font-family: "Courier New", monospace;
+  font-size: 9px;
+}
+
+.archived-round > div span {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archived-round > p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.match-chat-details {
+  margin: 0 0 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(245, 237, 223, 0.6);
+}
+
+.match-chat-details summary {
+  padding: 10px 12px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.match-chat-list {
+  max-height: 180px;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+}
+
+.match-chat-list p {
+  margin: 5px 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.match-chat-list strong,
+.match-chat-list time {
+  color: var(--ink);
+}
+
+.match-dialog-content > .dialog-button {
+  max-width: 190px;
   margin: 0 auto;
 }
 
@@ -1534,6 +1925,14 @@ dialog::backdrop {
     font-size: 30px;
   }
 
+  .mode-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-picker label > span {
+    min-height: 58px;
+  }
+
   .card-number {
     top: 18px;
     right: 20px;
@@ -1566,6 +1965,24 @@ dialog::backdrop {
 
   .game-heading h1 {
     font-size: 3rem;
+  }
+
+  .theme-card {
+    padding: 15px 16px;
+  }
+
+  .theme-card-top {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .theme-source {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-left: 52px;
+  }
+
+  .theme-help {
+    margin-left: 0;
   }
 
   .room-actions {
@@ -1631,6 +2048,11 @@ dialog::backdrop {
     padding: 19px;
   }
 
+  .chat-tabs button,
+  .history-tabs button {
+    min-height: 34px;
+  }
+
   .chat-heading > p:last-child {
     display: none;
   }
@@ -1645,6 +2067,32 @@ dialog::backdrop {
 
   .chat-form input {
     font-size: 16px;
+  }
+
+  .match-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .match-card > button {
+    grid-column: 1 / -1;
+  }
+
+  .dialog-actions {
+    flex-direction: column;
+  }
+
+  .archived-round > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .archived-round > div span {
+    white-space: normal;
+  }
+
+  .match-dialog-content {
+    padding: 23px 18px;
   }
 
   .dialog-content {

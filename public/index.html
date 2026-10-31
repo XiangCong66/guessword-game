@@ -55,6 +55,23 @@
           <p class="section-kicker">START A ROOM</p>
           <h2 id="createTitle">发起一场</h2>
           <p>创建房间后会得到一扇专属的默契传送门，把链接发给朋友即可。</p>
+          <fieldset class="mode-picker">
+            <legend>选择玩法</legend>
+            <label>
+              <input type="radio" name="gameMode" value="classic" checked>
+              <span>
+                <strong>默契同词</strong>
+                <small>双方想到同一个词即获胜</small>
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="gameMode" value="theme">
+              <span>
+                <strong>AI 主题猜词</strong>
+                <small id="aiModeHint">GLM 生成随机主题，根据提示猜中隐藏词</small>
+              </span>
+            </label>
+          </fieldset>
           <button class="primary-button" id="createRoomButton" type="button">
             <span>创建房间</span>
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -117,6 +134,18 @@
           </button>
         </div>
       </div>
+
+      <section class="theme-card" id="themeCard" hidden aria-labelledby="themeClueTitle">
+        <div class="theme-card-top">
+          <span class="theme-icon" aria-hidden="true">✦</span>
+          <div>
+            <p class="section-kicker">AI THEME · <span id="themeCategory">主题</span></p>
+            <h2 id="themeClueTitle">正在准备主题…</h2>
+          </div>
+          <span class="theme-source" id="themeSource">主题保密</span>
+        </div>
+        <p class="theme-help" id="themeHelp">根据提示各猜一个词。猜中隐藏主题词时，语义更接近的一方获胜。</p>
+      </section>
 
       <section class="game-shell" aria-label="双人联网撞词游戏">
         <div class="game-toolbar">
@@ -198,6 +227,10 @@
           <p class="section-kicker">ROOM CHAT</p>
           <h2 id="chatTitle">房间对话</h2>
           <p>消息只在本房间同步，两位玩家都能看到。</p>
+          <div class="chat-tabs" role="tablist" aria-label="聊天频道">
+            <button id="roomChatTab" type="button" role="tab" aria-selected="true">房间</button>
+            <button id="globalChatTab" type="button" role="tab" aria-selected="false">全局</button>
+          </div>
         </div>
         <div class="chat-panel">
           <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-relevant="additions">
@@ -226,12 +259,23 @@
       </section>
 
       <section class="history-section" aria-labelledby="historyTitle">
-        <div>
+        <div class="history-heading">
           <p class="section-kicker">MEMORY LOG</p>
           <h2 id="historyTitle">默契记录</h2>
+          <div class="history-tabs" role="tablist" aria-label="对局记录">
+            <button id="currentMatchTab" type="button" role="tab" aria-selected="true">本局</button>
+            <button id="pastMatchTab" type="button" role="tab" aria-selected="false">
+              往期 <span id="pastMatchCount">0</span>
+            </button>
+          </div>
         </div>
-        <div class="history-list" id="historyList">
-          <span class="history-empty">还没有揭晓记录。</span>
+        <div class="history-panels">
+          <div class="history-list" id="historyList" role="tabpanel" aria-labelledby="currentMatchTab">
+            <span class="history-empty">还没有揭晓记录。</span>
+          </div>
+          <div class="matches-list" id="matchesList" role="tabpanel" aria-labelledby="pastMatchTab" hidden>
+            <span class="history-empty">完成一局后，可以在这里回看过程。</span>
+          </div>
         </div>
       </section>
     </section>
@@ -247,6 +291,7 @@
       <p class="dialog-kicker" id="roundDialogKicker">ROUND 01 · NO MATCH</p>
       <h2 id="roundDialogTitle">还没想到一起</h2>
       <p class="dialog-description" id="roundDialogDescription">两个词擦肩而过。看看彼此想到了什么，再继续下一回合。</p>
+      <p class="round-feedback" id="roundFeedback" hidden></p>
       <div class="compare-words" aria-label="本回合答案">
         <div class="compare-word player-a-word">
           <small>玩家 A</small>
@@ -266,12 +311,35 @@
   <dialog id="winDialog" aria-labelledby="winDialogTitle" aria-describedby="winDialogDescription">
     <div class="dialog-content win-content">
       <div class="win-burst" aria-hidden="true">✓</div>
-      <p class="dialog-kicker">YOU THOUGHT THE SAME</p>
+      <p class="dialog-kicker" id="winDialogKicker">YOU THOUGHT THE SAME</p>
       <h2 id="winDialogTitle">想到一起了！</h2>
       <div class="win-word" id="winWord">默契</div>
       <p class="dialog-description" id="winDialogDescription">你们成功撞词。</p>
-      <button class="dialog-button" id="playAgainButton" type="button">两边再玩一局</button>
+      <div class="win-verdict" id="winVerdict" hidden></div>
+      <div class="dialog-actions">
+        <button class="dialog-button secondary" id="viewWinMatchButton" type="button">查看本局过程</button>
+        <button class="dialog-button" id="playAgainButton" type="button">两边再玩一局</button>
+      </div>
       <p class="dialog-hint">重新开始会清空本局记录</p>
+    </div>
+  </dialog>
+
+  <dialog id="matchDialog" aria-labelledby="matchDialogTitle">
+    <div class="dialog-content match-dialog-content">
+      <div class="match-dialog-head">
+        <div>
+          <p class="dialog-kicker" id="matchDialogKicker">MATCH ARCHIVE</p>
+          <h2 id="matchDialogTitle">对局过程</h2>
+          <p class="dialog-description" id="matchDialogDescription"></p>
+        </div>
+        <button class="dialog-close" id="closeMatchDialogButton" type="button" aria-label="关闭对局过程">×</button>
+      </div>
+      <div class="match-rounds" id="matchRounds"></div>
+      <details class="match-chat-details" id="matchChatDetails">
+        <summary>查看本局聊天记录</summary>
+        <div class="match-chat-list" id="matchChatList"></div>
+      </details>
+      <button class="dialog-button" id="closeMatchDialogFooter" type="button">关闭</button>
     </div>
   </dialog>
 

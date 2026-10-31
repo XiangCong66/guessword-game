@@ -13,6 +13,8 @@
     lobbyScreen: document.getElementById("lobbyScreen"),
     gameScreen: document.getElementById("gameScreen"),
     createRoomButton: document.getElementById("createRoomButton"),
+    gameModeInputs: document.querySelectorAll('input[name="gameMode"]'),
+    aiModeHint: document.getElementById("aiModeHint"),
     joinForm: document.getElementById("joinForm"),
     roomCodeInput: document.getElementById("roomCodeInput"),
     joinRoomButton: document.getElementById("joinRoomButton"),
@@ -21,6 +23,11 @@
     roundNumber: document.getElementById("roundNumber"),
     roomCode: document.getElementById("roomCode"),
     copyInviteButton: document.getElementById("copyInviteButton"),
+    themeCard: document.getElementById("themeCard"),
+    themeCategory: document.getElementById("themeCategory"),
+    themeClueTitle: document.getElementById("themeClueTitle"),
+    themeSource: document.getElementById("themeSource"),
+    themeHelp: document.getElementById("themeHelp"),
     completedRounds: document.getElementById("completedRounds"),
     statusText: document.getElementById("statusText"),
     statusDot: document.getElementById("statusDot"),
@@ -62,17 +69,38 @@
     chatInput: document.getElementById("chatInput"),
     chatSendButton: document.getElementById("chatSendButton"),
     chatStatus: document.getElementById("chatStatus"),
+    roomChatTab: document.getElementById("roomChatTab"),
+    globalChatTab: document.getElementById("globalChatTab"),
     historyList: document.getElementById("historyList"),
+    matchesList: document.getElementById("matchesList"),
+    currentMatchTab: document.getElementById("currentMatchTab"),
+    pastMatchTab: document.getElementById("pastMatchTab"),
+    pastMatchCount: document.getElementById("pastMatchCount"),
     roundDialog: document.getElementById("roundDialog"),
     roundDialogKicker: document.getElementById("roundDialogKicker"),
+    roundDialogTitle: document.getElementById("roundDialogTitle"),
     roundDialogDescription: document.getElementById("roundDialogDescription"),
     resultWordA: document.getElementById("resultWordA"),
     resultWordB: document.getElementById("resultWordB"),
+    roundFeedback: document.getElementById("roundFeedback"),
     nextRoundButton: document.getElementById("nextRoundButton"),
     winDialog: document.getElementById("winDialog"),
+    winDialogKicker: document.getElementById("winDialogKicker"),
+    winDialogTitle: document.getElementById("winDialogTitle"),
     winWord: document.getElementById("winWord"),
     winDialogDescription: document.getElementById("winDialogDescription"),
+    winVerdict: document.getElementById("winVerdict"),
+    viewWinMatchButton: document.getElementById("viewWinMatchButton"),
     playAgainButton: document.getElementById("playAgainButton"),
+    matchDialog: document.getElementById("matchDialog"),
+    matchDialogKicker: document.getElementById("matchDialogKicker"),
+    matchDialogTitle: document.getElementById("matchDialogTitle"),
+    matchDialogDescription: document.getElementById("matchDialogDescription"),
+    matchRounds: document.getElementById("matchRounds"),
+    matchChatDetails: document.getElementById("matchChatDetails"),
+    matchChatList: document.getElementById("matchChatList"),
+    closeMatchDialogButton: document.getElementById("closeMatchDialogButton"),
+    closeMatchDialogFooter: document.getElementById("closeMatchDialogFooter"),
     toast: document.getElementById("toast"),
     confettiLayer: document.getElementById("confettiLayer")
   };
@@ -86,10 +114,20 @@
     submitting: false,
     sendingChat: false,
     celebratedRound: null,
+    dismissedWinMatchNumber: null,
     lastRound: null,
     lastPhase: null,
-    lastChatKey: "",
-    chatInitialized: false
+    chatChannel: "room",
+    globalChat: [],
+    chatKeys: {
+      room: "",
+      global: ""
+    },
+    chatInitialized: {
+      room: false,
+      global: false
+    },
+    historyTab: "current"
   };
 
   function normalizeCode(value) {
@@ -205,6 +243,11 @@
     try {
       const health = await request("/api/health");
       app.networkUrls = Array.isArray(health.networkUrls) ? health.networkUrls : [];
+      if (health.ai?.provider === "glm") {
+        elements.aiModeHint.textContent = health.ai.configured
+          ? "GLM 在线出题，根据提示猜中隐藏词"
+          : "未配置 GLM 密钥，将使用本地备用主题";
+      }
       setServerConnection("online", "服务器正常");
     } catch {
       setServerConnection("offline", "服务器未连接");
@@ -248,10 +291,29 @@
         showToast("同步数据时出现了一个小问题");
       }
     });
+
+    source.addEventListener("global-chat", (event) => {
+      try {
+        handleGlobalChatEvent(JSON.parse(event.data));
+      } catch {
+        showToast("全局聊天同步时出现了一个小问题");
+      }
+    });
   }
 
   function enterRoom(roomState, nextSession) {
     app.session = nextSession;
+    app.chatChannel = "room";
+    app.globalChat = [];
+    app.chatInitialized = {
+      room: false,
+      global: false
+    };
+    app.chatKeys = {
+      room: "",
+      global: ""
+    };
+    app.dismissedWinMatchNumber = null;
     writeSession(nextSession);
     elements.lobbyScreen.hidden = true;
     elements.gameScreen.hidden = false;
@@ -285,12 +347,20 @@
   }
 
   async function createRoom() {
-    setButtonBusy(elements.createRoomButton, true, "正在创建…");
+    const mode = document.querySelector('input[name="gameMode"]:checked')?.value || "classic";
+    setButtonBusy(
+      elements.createRoomButton,
+      true,
+      mode === "theme" ? "GLM 正在出题…" : "正在创建…"
+    );
     setLobbyMessage("");
 
     try {
       const payload = await request("/api/rooms", {
-        method: "POST"
+        method: "POST",
+        body: {
+          mode
+        }
       });
       const session = {
         roomId: payload.roomId,
@@ -345,14 +415,32 @@
     const playerB = roomState.players.B;
 
     if (roomState.phase === "waiting") {
-      return "房间已创建，正在等待朋友加入";
+      return roomState.mode === "theme"
+        ? "主题已准备好，正在等待朋友加入"
+        : "房间已创建，正在等待朋友加入";
     }
 
     if (roomState.phase === "won") {
+      if (roomState.mode === "theme" && roomState.result) {
+        if (!roomState.result.winnerPlayer) {
+          return "双方同时猜中主题，这一局平局";
+        }
+        return "玩家 " + roomState.result.winnerPlayer + " 猜中主题并获胜";
+      }
       return "撞词成功，这一局默契通关";
     }
 
+    if (roomState.phase === "judging") {
+      return "双方答案已封存，GLM 正在判断谁更接近主题";
+    }
+
     if (roomState.phase === "resolved") {
+      if (roomState.mode === "theme" && roomState.result) {
+        if (roomState.result.closer === "tie") {
+          return "还没有猜中，这一回合两边同样接近";
+        }
+        return "还没有猜中，玩家 " + roomState.result.closer + " 这一回合更接近";
+      }
       return "答案已揭晓，看看你们是否想到了一起";
     }
 
@@ -369,10 +457,35 @@
       return "玩家 B 已封存答案，等待玩家 A";
     }
 
-    return "第 " + roomState.round + " 回合，等你们各写下一个词";
+    return roomState.mode === "theme"
+      ? "第 " + roomState.round + " 回合，根据提示各猜一个词"
+      : "第 " + roomState.round + " 回合，等你们各写下一个词";
+  }
+
+  function renderTheme(roomState) {
+    const isTheme = roomState.mode === "theme" && roomState.theme;
+    elements.themeCard.hidden = !isTheme;
+    if (!isTheme) {
+      return;
+    }
+
+    elements.themeCategory.textContent = roomState.theme.category || "主题";
+    elements.themeClueTitle.textContent = roomState.theme.clue;
+
+    if (roomState.phase === "won" && roomState.theme.target) {
+      elements.themeSource.textContent = "主题：" + roomState.theme.target;
+      elements.themeHelp.textContent = "隐藏主题已经揭晓，本局结果已保存到往期对局。";
+    } else if (roomState.theme.source === "glm") {
+      elements.themeSource.textContent = "GLM 保密出题";
+      elements.themeHelp.textContent = "双方各猜一个词。猜中隐藏主题后，由 GLM 按语义接近度判定胜者。";
+    } else {
+      elements.themeSource.textContent = "备用主题";
+      elements.themeHelp.textContent = "GLM 暂未连接，当前使用备用主题；猜中隐藏主题后仍会进行接近度判定。";
+    }
   }
 
   function renderPlayers(roomState) {
+    const isTheme = roomState.mode === "theme";
     const canPlay = roomState.phase === "playing" && roomState.players.A.joined && roomState.players.B.joined;
     const roundChanged = app.lastRound !== roomState.round;
     const phaseChanged = app.lastPhase !== roomState.phase;
@@ -388,7 +501,9 @@
       const button = elements.submitButtons[index];
 
       elements.playerCards[index].classList.toggle("is-own", Boolean(isOwn));
-      elements.answerLabels[index].textContent = isOwn ? "你的词" : "玩家 " + player + " 的词";
+      elements.answerLabels[index].textContent = isOwn
+        ? isTheme ? "你的猜测" : "你的词"
+        : "玩家 " + player + (isTheme ? " 的猜测" : " 的词");
 
       if (!playerState.joined) {
         elements.playerNotes[index].textContent = "正在等待加入";
@@ -421,19 +536,23 @@
         input.placeholder = "等待玩家加入";
         elements.wordStates[index].textContent = "等待中";
       } else if (!isOwn) {
-        input.placeholder = playerState.online ? "对方正在想词" : "对方暂时离线";
+        input.placeholder = playerState.online
+          ? isTheme ? "对方正在猜" : "对方正在想词"
+          : "对方暂时离线";
         elements.wordStates[index].textContent = "实时同步";
       } else if (!canPlay) {
         input.placeholder = "本回合暂不可输入";
         elements.wordStates[index].textContent = "等待揭晓";
       } else {
-        input.placeholder = "写下一个词";
+        input.placeholder = isTheme ? "写下你的猜测" : "写下一个词";
         elements.wordStates[index].textContent = "等待你写";
       }
 
       const buttonLabel = button.querySelector("span");
       if (buttonLabel) {
-        buttonLabel.textContent = isSubmitted ? "已提交，等待揭晓" : "提交这个词";
+        buttonLabel.textContent = isSubmitted
+          ? "已提交，等待揭晓"
+          : isTheme ? "提交猜测" : "提交这个词";
       }
     });
 
@@ -465,14 +584,96 @@
       const separator = document.createElement("span");
       const wordB = document.createElement("strong");
 
-      chip.className = "history-chip" + (entry.isMatch ? " is-match" : "");
+      chip.className = "history-chip" +
+        (entry.isMatch ? " is-match" : "") +
+        (entry.mode === "theme" ? " is-theme" : "");
       round.textContent = "R" + String(entry.round).padStart(2, "0");
       wordA.textContent = entry.answers.A;
       separator.textContent = entry.isMatch ? "＝" : "↔";
       wordB.textContent = entry.answers.B;
       chip.append(round, wordA, separator, wordB);
+      if (entry.mode === "theme" && entry.target) {
+        const target = document.createElement("small");
+        target.className = "history-target";
+        target.textContent = "主题：" + entry.target;
+        chip.appendChild(target);
+      }
       elements.historyList.appendChild(chip);
     });
+  }
+
+  function formatMatchDate(timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    return date.toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+  }
+
+  function matchResultText(match) {
+    if (match.mode === "theme") {
+      if (match.winnerPlayer) {
+        return "玩家 " + match.winnerPlayer + " 获胜";
+      }
+      return "平局";
+    }
+    return "默契通关";
+  }
+
+  function renderMatches(matches) {
+    const entries = Array.isArray(matches) ? matches : [];
+    elements.matchesList.replaceChildren();
+    elements.pastMatchCount.textContent = String(entries.length);
+
+    if (entries.length === 0) {
+      const empty = document.createElement("span");
+      empty.className = "history-empty";
+      empty.textContent = "完成一局后，可以在这里回看过程。";
+      elements.matchesList.appendChild(empty);
+      return;
+    }
+
+    entries.forEach((match) => {
+      const card = document.createElement("article");
+      const info = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      const badge = document.createElement("span");
+      const button = document.createElement("button");
+
+      card.className = "match-card";
+      title.textContent = "第 " + match.number + " 局 · " + matchResultText(match);
+      meta.textContent =
+        formatMatchDate(match.endedAt) +
+        " · " +
+        match.roundCount +
+        " 回合 · " +
+        (match.winnerWord || "未记录");
+      badge.textContent = match.mode === "theme" ? "AI 主题" : "默契同词";
+      button.type = "button";
+      button.textContent = "查看过程";
+      button.addEventListener("click", () => openMatch(match.id));
+      info.append(title, meta);
+      card.append(info, badge, button);
+      elements.matchesList.appendChild(card);
+    });
+  }
+
+  function setHistoryTab(tab) {
+    app.historyTab = tab === "past" ? "past" : "current";
+    const showPast = app.historyTab === "past";
+    elements.currentMatchTab.setAttribute("aria-selected", String(!showPast));
+    elements.pastMatchTab.setAttribute("aria-selected", String(showPast));
+    elements.currentMatchTab.classList.toggle("is-active", !showPast);
+    elements.pastMatchTab.classList.toggle("is-active", showPast);
+    elements.historyList.hidden = showPast;
+    elements.matchesList.hidden = !showPast;
   }
 
   function formatChatTime(timestamp) {
@@ -487,21 +688,26 @@
     });
   }
 
-  function renderChat(messages) {
+  function renderChat(messages, channel = app.chatChannel) {
     const chatMessages = Array.isArray(messages) ? messages : [];
-    const chatKey = chatMessages.map((message) => message.id).join("|");
-    if (app.chatInitialized && app.lastChatKey === chatKey) {
+    const chatKey = channel + ":" + chatMessages.map((message) => message.id).join("|");
+    if (
+      app.chatInitialized[channel] &&
+      app.chatKeys[channel] === chatKey
+    ) {
       return;
     }
 
-    const wasNearBottom = !app.chatInitialized ||
+    const wasNearBottom = !app.chatInitialized[channel] ||
       elements.chatMessages.scrollHeight - elements.chatMessages.scrollTop - elements.chatMessages.clientHeight < 48;
     elements.chatMessages.replaceChildren();
 
     if (chatMessages.length === 0) {
       const empty = document.createElement("p");
       empty.className = "chat-empty";
-      empty.textContent = "还没有消息，打个招呼吧。";
+      empty.textContent = channel === "global"
+        ? "全局频道还没有消息，和所有在线玩家打个招呼吧。"
+        : "还没有消息，和房间里的朋友打个招呼吧。";
       elements.chatMessages.appendChild(empty);
     } else {
       chatMessages.forEach((message) => {
@@ -520,6 +726,9 @@
         content.className = "chat-message-content";
         meta.className = "chat-message-meta";
         player.textContent = "玩家 " + message.player;
+        if (channel === "global" && message.roomId) {
+          player.textContent += " · 房间 " + message.roomId;
+        }
         time.dateTime = new Date(message.time).toISOString();
         time.textContent = formatChatTime(message.time);
         text.textContent = message.text;
@@ -533,21 +742,173 @@
     if (wasNearBottom) {
       elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
     }
-    app.lastChatKey = chatKey;
-    app.chatInitialized = true;
+    app.chatKeys[channel] = chatKey;
+    app.chatInitialized[channel] = true;
   }
 
   function renderChatControls(roomState) {
-    const canChat = Boolean(app.session && roomState && roomState.players[app.session.player]?.joined);
+    const canChat = Boolean(
+      app.session &&
+      roomState &&
+      roomState.players[app.session.player]?.joined
+    );
     elements.chatInput.disabled = !canChat || app.sendingChat;
     elements.chatSendButton.disabled = !canChat || app.sendingChat;
+    elements.chatInput.placeholder = app.chatChannel === "global"
+      ? "对所有在线玩家说点什么…"
+      : "和房间里的朋友说点什么…";
 
     if (!canChat) {
       elements.chatStatus.textContent = "连接房间后可以发送消息";
+    } else if (app.chatChannel === "global") {
+      elements.chatStatus.textContent = "按回车发送 · 会显示给所有在线玩家";
     } else if (!roomState.players.B?.joined) {
       elements.chatStatus.textContent = "朋友加入后，消息会在同一房间同步";
     } else {
       elements.chatStatus.textContent = "按回车发送 · 仅本房间可见";
+    }
+  }
+
+  function activeChatMessages() {
+    return app.chatChannel === "global"
+      ? app.globalChat
+      : (app.room?.chat || []);
+  }
+
+  function renderActiveChat() {
+    renderChat(activeChatMessages(), app.chatChannel);
+  }
+
+  function handleGlobalChatEvent(payload) {
+    if (payload?.type === "snapshot") {
+      app.globalChat = Array.isArray(payload.messages) ? payload.messages : [];
+    } else if (payload?.type === "message" && payload.message) {
+      if (!app.globalChat.some((message) => message.id === payload.message.id)) {
+        app.globalChat.push(payload.message);
+      }
+      if (app.globalChat.length > 100) {
+        app.globalChat.splice(0, app.globalChat.length - 100);
+      }
+    }
+
+    if (app.chatChannel === "global") {
+      renderChat(app.globalChat, "global");
+    }
+  }
+
+  function setChatChannel(channel) {
+    app.chatChannel = channel === "global" ? "global" : "room";
+    const isGlobal = app.chatChannel === "global";
+    elements.roomChatTab.setAttribute("aria-selected", String(!isGlobal));
+    elements.globalChatTab.setAttribute("aria-selected", String(isGlobal));
+    elements.roomChatTab.classList.toggle("is-active", !isGlobal);
+    elements.globalChatTab.classList.toggle("is-active", isGlobal);
+    elements.roomChatTab.parentElement.parentElement.querySelector(".section-kicker").textContent =
+      isGlobal ? "GLOBAL CHAT" : "ROOM CHAT";
+    document.getElementById("chatTitle").textContent = isGlobal ? "全局对话" : "房间对话";
+    elements.roomChatTab.parentElement.parentElement.querySelector("p:not(.section-kicker)").textContent =
+      isGlobal
+        ? "所有房间的在线玩家都能看到，请不要发送隐私信息。"
+        : "消息只在本房间同步，两位玩家都能看到。";
+    elements.chatInput.value = "";
+    renderActiveChat();
+    renderChatControls(app.room);
+  }
+
+  function closeMatchDialog() {
+    if (elements.matchDialog.open) {
+      elements.matchDialog.close();
+    }
+  }
+
+  function renderArchivedMatch(match) {
+    elements.matchDialogKicker.textContent =
+      "MATCH " + String(match.number).padStart(2, "0") + " · " +
+      (match.mode === "theme" ? "AI THEME" : "CLASSIC");
+    elements.matchDialogTitle.textContent =
+      "第 " + match.number + " 局 · " + matchResultText(match);
+    elements.matchDialogDescription.textContent =
+      formatMatchDate(match.endedAt) +
+      " · " +
+      match.rounds.length +
+      " 回合 · 结果：" +
+      (match.winnerWord || "平局");
+    elements.matchRounds.replaceChildren();
+
+    match.rounds.forEach((round) => {
+      const row = document.createElement("article");
+      const heading = document.createElement("div");
+      const roundNumber = document.createElement("strong");
+      const words = document.createElement("span");
+      const outcome = document.createElement("p");
+
+      row.className = "archived-round" + (round.isMatch ? " is-final" : "");
+      roundNumber.textContent = "ROUND " + String(round.round).padStart(2, "0");
+      words.textContent = "A：" + round.answers.A + "　B：" + round.answers.B;
+      heading.append(roundNumber, words);
+
+      if (round.mode === "theme" && round.isMatch) {
+        outcome.textContent =
+          "隐藏主题：" + round.target +
+          " · A " + round.scores.A + " 分 · B " + round.scores.B + " 分";
+      } else if (round.mode === "theme") {
+        outcome.textContent =
+          (round.closer === "tie" ? "双方同样接近" : "玩家 " + round.closer + " 更接近") +
+          " · " + (round.explanation || "");
+      } else {
+        outcome.textContent = round.isMatch
+          ? "双方成功撞词：" + round.winner
+          : "本回合没有撞上";
+      }
+
+      row.append(heading, outcome);
+      elements.matchRounds.appendChild(row);
+    });
+
+    elements.matchChatList.replaceChildren();
+    if (!match.chat || match.chat.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = "这局没有房间聊天记录。";
+      elements.matchChatList.appendChild(empty);
+    } else {
+      match.chat.forEach((message) => {
+        const row = document.createElement("p");
+        const who = document.createElement("strong");
+        const time = document.createElement("time");
+        who.textContent = "玩家 " + message.player;
+        time.textContent = formatChatTime(message.time);
+        row.append(who, " · ", time, "：", message.text);
+        elements.matchChatList.appendChild(row);
+      });
+    }
+    elements.matchChatDetails.open = false;
+  }
+
+  async function openMatch(matchId) {
+    if (!matchId || !app.session) {
+      return;
+    }
+
+    if (elements.winDialog.open) {
+      app.dismissedWinMatchNumber = app.room?.matchNumber || null;
+      elements.winDialog.close();
+    }
+
+    try {
+      const payload = await request(
+        "/api/rooms/" +
+        encodeURIComponent(app.session.roomId) +
+        "/match?token=" +
+        encodeURIComponent(app.session.token) +
+        "&matchId=" +
+        encodeURIComponent(matchId)
+      );
+      renderArchivedMatch(payload.match);
+      elements.matchDialog.showModal();
+      elements.closeMatchDialogButton.focus();
+    } catch (error) {
+      showToast(error.message);
     }
   }
 
@@ -570,12 +931,26 @@
     }
 
     closeWinDialog();
-    elements.roundDialogKicker.textContent =
-      "ROUND " + String(result.round).padStart(2, "0") + " · NO MATCH";
+    const isTheme = result.mode === "theme";
+    elements.roundDialogKicker.textContent = isTheme
+      ? "THEME · ROUND " + String(result.round).padStart(2, "0")
+      : "ROUND " + String(result.round).padStart(2, "0") + " · NO MATCH";
+    elements.roundDialogTitle.textContent = isTheme ? "还没有猜中主题" : "还没想到一起";
     elements.resultWordA.textContent = result.answers.A;
     elements.resultWordB.textContent = result.answers.B;
-    elements.roundDialogDescription.textContent =
-      "两个词擦肩而过。看看彼此想到了什么，再继续下一回合。";
+    elements.roundDialogDescription.textContent = isTheme
+      ? "隐藏主题仍然保密。看看本回合谁更接近，再根据提示继续猜。"
+      : "两个词擦肩而过。看看彼此想到了什么，再继续下一回合。";
+    if (isTheme) {
+      const closerText = result.closer === "tie"
+        ? "这一回合双方同样接近"
+        : "这一回合玩家 " + result.closer + " 更接近主题";
+      elements.roundFeedback.hidden = false;
+      elements.roundFeedback.textContent = closerText + "。" + (result.explanation || "");
+    } else {
+      elements.roundFeedback.hidden = true;
+      elements.roundFeedback.textContent = "";
+    }
     elements.nextRoundButton.disabled = false;
     elements.roundDialog.showModal();
     elements.nextRoundButton.focus();
@@ -583,20 +958,46 @@
 
   function showWinResult(roomState) {
     const result = roomState.result;
-    if (!result || elements.winDialog.open) {
+    if (
+      !result ||
+      elements.winDialog.open ||
+      app.dismissedWinMatchNumber === roomState.matchNumber
+    ) {
       return;
     }
 
     closeRoundDialog();
     elements.winWord.textContent = result.winner;
-    elements.winDialogDescription.textContent =
-      "你们在第 " + result.round + " 回合成功想到同一个词「" + result.winner + "」。";
+    const latestMatch = roomState.matches?.find((match) => match.number === roomState.matchNumber);
+    elements.viewWinMatchButton.hidden = !latestMatch;
+    elements.viewWinMatchButton.dataset.matchId = latestMatch?.id || "";
+
+    if (result.mode === "theme") {
+      elements.winDialogKicker.textContent = "THEME FOUND";
+      elements.winDialogTitle.textContent = result.winnerPlayer
+        ? "玩家 " + result.winnerPlayer + " 获胜！"
+        : "双方同时猜中！";
+      elements.winDialogDescription.textContent = result.winnerPlayer
+        ? "隐藏主题是「" + result.target + "」。玩家 " + result.winnerPlayer + " 猜中主题，并按语义接近度获胜。"
+        : "隐藏主题是「" + result.target + "」。双方同时猜中，本局平局。";
+      elements.winVerdict.hidden = false;
+      elements.winVerdict.textContent =
+        "A " + result.scores.A + " 分 · B " + result.scores.B + " 分";
+    } else {
+      elements.winDialogKicker.textContent = "YOU THOUGHT THE SAME";
+      elements.winDialogTitle.textContent = "想到一起了！";
+      elements.winDialogDescription.textContent =
+        "你们在第 " + result.round + " 回合成功想到同一个词「" + result.winner + "」。";
+      elements.winVerdict.hidden = true;
+      elements.winVerdict.textContent = "";
+    }
     elements.playAgainButton.disabled = false;
     elements.winDialog.showModal();
     elements.playAgainButton.focus();
 
-    if (app.celebratedRound !== result.round) {
-      app.celebratedRound = result.round;
+    const celebrationKey = roomState.matchNumber + ":" + result.round;
+    if (app.celebratedRound !== celebrationKey) {
+      app.celebratedRound = celebrationKey;
       createConfetti();
     }
   }
@@ -609,19 +1010,29 @@
     app.room = roomState;
     elements.lobbyScreen.hidden = true;
     elements.gameScreen.hidden = false;
-    elements.playerLabel.textContent = "你是玩家 " + app.session.player;
+    elements.playerLabel.textContent =
+      "你是玩家 " + app.session.player +
+      (roomState.mode === "theme" ? " · AI 主题模式" : " · 默契同词模式");
     elements.roundNumber.textContent = String(roomState.round).padStart(2, "0");
     elements.roomCode.textContent = roomState.roomId;
     elements.completedRounds.textContent = String(roomState.completed);
+    if (app.dismissedWinMatchNumber !== roomState.matchNumber && roomState.phase !== "won") {
+      app.dismissedWinMatchNumber = null;
+    }
 
     const message = statusMessage(roomState);
     elements.statusText.textContent = message;
-    elements.statusDot.classList.toggle("is-waiting", roomState.phase === "waiting");
+    elements.statusDot.classList.toggle(
+      "is-waiting",
+      roomState.phase === "waiting" || roomState.phase === "judging"
+    );
     elements.statusDot.classList.toggle("is-ready", roomState.phase === "playing" || roomState.phase === "won");
 
+    renderTheme(roomState);
     renderPlayers(roomState);
     renderHistory(roomState.history);
-    renderChat(roomState.chat);
+    renderMatches(roomState.matches);
+    renderActiveChat();
     renderChatControls(roomState);
 
     if (roomState.phase === "resolved" && roomState.result && !roomState.result.isMatch) {
@@ -643,7 +1054,7 @@
     void input.offsetWidth;
     input.classList.add("has-error");
     input.focus();
-    showToast("先写下一个词再提交");
+    showToast(app.room?.mode === "theme" ? "先写下你的猜测再提交" : "先写下一个词再提交");
     window.setTimeout(() => input.classList.remove("has-error"), 600);
   }
 
@@ -732,9 +1143,12 @@
 
     app.sendingChat = true;
     renderChatControls(app.room);
+    const channel = app.chatChannel;
     try {
       const payload = await request(
-        "/api/rooms/" + encodeURIComponent(app.session.roomId) + "/chat",
+        "/api/rooms/" +
+        encodeURIComponent(app.session.roomId) +
+        (channel === "global" ? "/global-chat" : "/chat"),
         {
           method: "POST",
           body: {
@@ -744,7 +1158,14 @@
         }
       );
       elements.chatInput.value = "";
-      applyState(payload);
+      if (channel === "global") {
+        handleGlobalChatEvent({
+          type: "message",
+          message: payload.message
+        });
+      } else {
+        applyState(payload);
+      }
     } catch (error) {
       showToast(error.message);
     } finally {
@@ -759,6 +1180,8 @@
       return;
     }
 
+    const isTheme = app.room.mode === "theme";
+    elements.playAgainButton.textContent = isTheme ? "生成新主题…" : "正在重新开始…";
     elements.playAgainButton.disabled = true;
     try {
       const payload = await request(
@@ -771,11 +1194,15 @@
         }
       );
       app.celebratedRound = null;
+      app.dismissedWinMatchNumber = null;
       elements.confettiLayer.replaceChildren();
+      setHistoryTab("current");
       applyState(payload);
     } catch (error) {
       elements.playAgainButton.disabled = false;
       showToast(error.message);
+    } finally {
+      elements.playAgainButton.textContent = "两边再玩一局";
     }
   }
 
@@ -889,6 +1316,15 @@
     event.preventDefault();
     sendChat();
   });
+  elements.roomChatTab.addEventListener("click", () => setChatChannel("room"));
+  elements.globalChatTab.addEventListener("click", () => setChatChannel("global"));
+  elements.currentMatchTab.addEventListener("click", () => setHistoryTab("current"));
+  elements.pastMatchTab.addEventListener("click", () => setHistoryTab("past"));
+  elements.viewWinMatchButton.addEventListener("click", () => {
+    openMatch(elements.viewWinMatchButton.dataset.matchId);
+  });
+  elements.closeMatchDialogButton.addEventListener("click", closeMatchDialog);
+  elements.closeMatchDialogFooter.addEventListener("click", closeMatchDialog);
   elements.nextRoundButton.addEventListener("click", nextRound);
   elements.playAgainButton.addEventListener("click", restartGame);
 
@@ -896,6 +1332,8 @@
   elements.winDialog.addEventListener("cancel", (event) => event.preventDefault());
 
   async function boot() {
+    setChatChannel("room");
+    setHistoryTab("current");
     const queryCode = normalizeCode(new URLSearchParams(window.location.search).get("room"));
     if (queryCode) {
       elements.roomCodeInput.value = queryCode;
