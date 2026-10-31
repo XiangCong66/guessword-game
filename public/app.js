@@ -245,7 +245,7 @@
       app.networkUrls = Array.isArray(health.networkUrls) ? health.networkUrls : [];
       if (health.ai?.provider === "deepseek") {
         elements.aiModeHint.textContent = health.ai.configured
-          ? "DeepSeek 在线出题，根据提示猜中隐藏词"
+          ? "DeepSeek 在线出题，同词后依据整局表现评分"
           : "未配置 DeepSeek 密钥，将使用本地备用主题";
       }
       setServerConnection("online", "服务器正常");
@@ -423,23 +423,20 @@
     if (roomState.phase === "won") {
       if (roomState.mode === "theme" && roomState.result) {
         if (!roomState.result.winnerPlayer) {
-          return "双方同时猜中主题，这一局平局";
+          return "双方说出同一个词，整局评分相同";
         }
-        return "玩家 " + roomState.result.winnerPlayer + " 猜中主题并获胜";
+        return "双方成功同词，玩家 " + roomState.result.winnerPlayer + " 综合评分获胜";
       }
       return "撞词成功，这一局默契通关";
     }
 
     if (roomState.phase === "judging") {
-      return "双方答案已封存，DeepSeek 正在判断谁更接近主题";
+      return "双方已经同词，DeepSeek 正在回看整局所有词语并评分";
     }
 
     if (roomState.phase === "resolved") {
       if (roomState.mode === "theme" && roomState.result) {
-        if (roomState.result.closer === "tie") {
-          return "还没有猜中，这一回合两边同样接近";
-        }
-        return "还没有猜中，玩家 " + roomState.result.closer + " 这一回合更接近";
+        return "还没有说出同一个词，继续围绕主题联想";
       }
       return "答案已揭晓，看看你们是否想到了一起";
     }
@@ -458,7 +455,7 @@
     }
 
     return roomState.mode === "theme"
-      ? "第 " + roomState.round + " 回合，根据提示各猜一个词"
+      ? "第 " + roomState.round + " 回合，围绕主题各猜一个词"
       : "第 " + roomState.round + " 回合，等你们各写下一个词";
   }
 
@@ -470,17 +467,14 @@
     }
 
     elements.themeCategory.textContent = roomState.theme.category || "主题";
-    elements.themeClueTitle.textContent = roomState.theme.clue;
+    elements.themeClueTitle.textContent = roomState.theme.theme;
 
-    if (roomState.phase === "won" && roomState.theme.target) {
-      elements.themeSource.textContent = "主题：" + roomState.theme.target;
-      elements.themeHelp.textContent = "隐藏主题已经揭晓，本局结果已保存到往期对局。";
-    } else if (roomState.theme.source === "deepseek") {
-      elements.themeSource.textContent = "DeepSeek 保密出题";
-      elements.themeHelp.textContent = "双方各猜一个词。猜中隐藏主题后，由 DeepSeek 按语义接近度判定胜者。";
+    if (roomState.theme.source === "deepseek") {
+      elements.themeSource.textContent = "DeepSeek 主题";
+      elements.themeHelp.textContent = "围绕主题持续猜词，直到双方说出同一个词；随后 DeepSeek 会回看整局所有词语评分。";
     } else {
       elements.themeSource.textContent = "备用主题";
-      elements.themeHelp.textContent = "DeepSeek 暂未连接，当前使用备用主题；猜中隐藏主题后仍会进行接近度判定。";
+      elements.themeHelp.textContent = "DeepSeek 暂未连接。先围绕主题猜词，双方同词后仍会按整局词语估算分数。";
     }
   }
 
@@ -592,11 +586,11 @@
       separator.textContent = entry.isMatch ? "＝" : "↔";
       wordB.textContent = entry.answers.B;
       chip.append(round, wordA, separator, wordB);
-      if (entry.mode === "theme" && entry.target) {
-        const target = document.createElement("small");
-        target.className = "history-target";
-        target.textContent = "主题：" + entry.target;
-        chip.appendChild(target);
+      if (entry.mode === "theme" && entry.isMatch && entry.scores) {
+        const score = document.createElement("small");
+        score.className = "history-target";
+        score.textContent = "整局 A " + entry.scores.A + " · B " + entry.scores.B;
+        chip.appendChild(score);
       }
       elements.historyList.appendChild(chip);
     });
@@ -849,12 +843,11 @@
 
       if (round.mode === "theme" && round.isMatch) {
         outcome.textContent =
-          "隐藏主题：" + round.target +
-          " · A " + round.scores.A + " 分 · B " + round.scores.B + " 分";
+          "公开主题：" + round.theme +
+          " · 整局 A " + round.scores.A + " 分 · B " + round.scores.B +
+          " 分 · " + round.explanation;
       } else if (round.mode === "theme") {
-        outcome.textContent =
-          (round.closer === "tie" ? "双方同样接近" : "玩家 " + round.closer + " 更接近") +
-          " · " + (round.explanation || "");
+        outcome.textContent = "本回合双方没有说出同一个词，继续围绕主题联想";
       } else {
         outcome.textContent = round.isMatch
           ? "双方成功撞词：" + round.winner
@@ -935,18 +928,16 @@
     elements.roundDialogKicker.textContent = isTheme
       ? "THEME · ROUND " + String(result.round).padStart(2, "0")
       : "ROUND " + String(result.round).padStart(2, "0") + " · NO MATCH";
-    elements.roundDialogTitle.textContent = isTheme ? "还没有猜中主题" : "还没想到一起";
+    elements.roundDialogTitle.textContent = isTheme ? "还没有说出同一个词" : "还没想到一起";
     elements.resultWordA.textContent = result.answers.A;
     elements.resultWordB.textContent = result.answers.B;
     elements.roundDialogDescription.textContent = isTheme
-      ? "隐藏主题仍然保密。看看本回合谁更接近，再根据提示继续猜。"
+      ? "新模式和默契模式一样，要继续猜词，直到双方说出完全相同的词才会结束。"
       : "两个词擦肩而过。看看彼此想到了什么，再继续下一回合。";
     if (isTheme) {
-      const closerText = result.closer === "tie"
-        ? "这一回合双方同样接近"
-        : "这一回合玩家 " + result.closer + " 更接近主题";
       elements.roundFeedback.hidden = false;
-      elements.roundFeedback.textContent = closerText + "。" + (result.explanation || "");
+      elements.roundFeedback.textContent =
+        "本回合不计分。双方同词后，AI 会综合整局所有词语给两人评分。";
     } else {
       elements.roundFeedback.hidden = true;
       elements.roundFeedback.textContent = "";
@@ -973,13 +964,16 @@
     elements.viewWinMatchButton.dataset.matchId = latestMatch?.id || "";
 
     if (result.mode === "theme") {
-      elements.winDialogKicker.textContent = "THEME FOUND";
+      elements.winDialogKicker.textContent = "THEME JOURNEY COMPLETE";
       elements.winDialogTitle.textContent = result.winnerPlayer
-        ? "玩家 " + result.winnerPlayer + " 获胜！"
-        : "双方同时猜中！";
+        ? "玩家 " + result.winnerPlayer + " 综合评分获胜！"
+        : "双方评分相同！";
       elements.winDialogDescription.textContent = result.winnerPlayer
-        ? "隐藏主题是「" + result.target + "」。玩家 " + result.winnerPlayer + " 猜中主题，并按语义接近度获胜。"
-        : "隐藏主题是「" + result.target + "」。双方同时猜中，本局平局。";
+        ? "主题是「" + result.theme + "」。双方在第 " + result.round +
+          " 回合同时说出「" + result.winner + "」，DeepSeek 回看整局后判定玩家 " +
+          result.winnerPlayer + " 更贴近主题。"
+        : "主题是「" + result.theme + "」。双方在第 " + result.round +
+          " 回合同时说出「" + result.winner + "」，但整局综合评分相同。";
       elements.winVerdict.hidden = false;
       elements.winVerdict.textContent =
         "A " + result.scores.A + " 分 · B " + result.scores.B + " 分";
