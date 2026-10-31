@@ -40,6 +40,54 @@ const FALLBACK_THEMES = [
   { theme: "运动比赛", category: "活动" }
 ];
 
+const CHEMISTRY_TIERS = [
+  {
+    min: 90,
+    label: "心有灵犀",
+    slogans: [
+      "你们不是猜词，是在共享同一套脑回路。",
+      "这一局，连停顿都像提前商量好了。",
+      "高浓度的默契，让每一个词都在互相招手。"
+    ]
+  },
+  {
+    min: 75,
+    label: "同频共振",
+    slogans: [
+      "彼此的思路已经接上同一条线。",
+      "一点点靠近，就能听见默契发芽。",
+      "已经很合拍，下一局只会更有火花。"
+    ]
+  },
+  {
+    min: 60,
+    label: "渐入佳境",
+    slogans: [
+      "你们的频道正在慢慢对齐。",
+      "偶尔错过，但总能带着惊喜回来。",
+      "默契不急，它已经在路上。"
+    ]
+  },
+  {
+    min: 40,
+    label: "各有风景",
+    slogans: [
+      "两种不同的脑回路，也能碰出有趣的火花。",
+      "你们各有各的风景，这正是游戏好玩的地方。",
+      "答案不同，但快乐始终在同一条线上。"
+    ]
+  },
+  {
+    min: 0,
+    label: "火花初现",
+    slogans: [
+      "今天的灵感很自由，下一次再一起捕捉它。",
+      "不同的想法撞在一起，才有新鲜的故事。",
+      "每一次意外，都是下一轮默契的伏笔。"
+    ]
+  }
+];
+
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -263,6 +311,31 @@ function fallbackJourneyScore(theme, words) {
   return Math.round(wordScores.reduce((sum, score) => sum + score, 0) / wordScores.length);
 }
 
+function clampChemistry(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function fallbackChemistry(scores) {
+  const average = (scores.A + scores.B) / 2;
+  const gap = Math.abs(scores.A - scores.B);
+  return clampChemistry(average * 0.7 + (100 - gap) * 0.3);
+}
+
+function chemistryPresentation(score, seed) {
+  const normalized = clampChemistry(score) ?? 50;
+  const tier = CHEMISTRY_TIERS.find((entry) => normalized >= entry.min) || CHEMISTRY_TIERS.at(-1);
+  const sloganIndex = Math.abs(Number(seed) || 0) % tier.slogans.length;
+  return {
+    score: normalized,
+    label: tier.label,
+    slogan: tier.slogans[sloganIndex]
+  };
+}
+
 async function judgeThemeJourney(theme, wordsA, wordsB) {
   let judgement;
 
@@ -274,6 +347,7 @@ async function judgeThemeJourney(theme, wordsA, wordsB) {
     judgement = {
       scores,
       closer: scores.A === scores.B ? "tie" : scores.A > scores.B ? "A" : "B",
+      chemistry: fallbackChemistry(scores),
       explanation: "AI 暂时不可用，当前按整局词语与主题的字面关联进行估算。",
       source: "fallback"
     };
@@ -294,7 +368,9 @@ async function judgeThemeJourney(theme, wordsA, wordsB) {
             "双方最终说出了同一个词，游戏现在结束。",
             "请综合每个人整局的全部词，而不只看最后一个词，评价其联想的一致性、贴合度与丰富度。",
             "给出每人0到100的总体分数，并判断谁更贴近公开主题。",
-            "严格返回：{\"scoreA\":数字,\"scoreB\":数字,\"closer\":\"A或B或tie\",\"explanation\":\"60字以内\"}"
+            "另外给出0到100的默契度，综合两人使用词语的呼应程度、思路一致性和互动质量。",
+            "无论分数高低，解释必须积极、友善，不贬低任何玩家。",
+            "严格返回：{\"scoreA\":数字,\"scoreB\":数字,\"closer\":\"A或B或tie\",\"chemistry\":数字,\"explanation\":\"60字以内\"}"
           ].join("\n")
         }
       ], {
@@ -313,6 +389,10 @@ async function judgeThemeJourney(theme, wordsA, wordsB) {
           B: Math.max(0, Math.min(100, Math.round(scoreB)))
         },
         closer: scoreA === scoreB ? "tie" : scoreA > scoreB ? "A" : "B",
+        chemistry: clampChemistry(parsed.chemistry) ?? fallbackChemistry({
+          A: Math.max(0, Math.min(100, Math.round(scoreA))),
+          B: Math.max(0, Math.min(100, Math.round(scoreB)))
+        }),
         explanation: typeof parsed.explanation === "string"
           ? parsed.explanation.trim().slice(0, 80)
           : "AI 已综合整局词语完成评分。",
@@ -327,6 +407,7 @@ async function judgeThemeJourney(theme, wordsA, wordsB) {
       judgement = {
         scores,
         closer: scores.A === scores.B ? "tie" : scores.A > scores.B ? "A" : "B",
+        chemistry: fallbackChemistry(scores),
         explanation: "AI 暂时不可用，当前按整局词语与主题的字面关联进行估算。",
         source: "fallback"
       };
@@ -427,6 +508,7 @@ function isPlayerOnline(roomId, player) {
 }
 
 function publicMatchSummary(match) {
+  const finalResult = [...match.rounds].reverse().find((round) => round.isMatch);
   return {
     id: match.id,
     number: match.number,
@@ -435,7 +517,9 @@ function publicMatchSummary(match) {
     endedAt: match.endedAt,
     roundCount: match.rounds.length,
     winnerWord: match.winnerWord || null,
-    winnerPlayer: match.winnerPlayer || null
+    winnerPlayer: match.winnerPlayer || null,
+    chemistry: finalResult?.chemistry ?? null,
+    chemistryLabel: finalResult?.chemistryLabel ?? null
   };
 }
 
@@ -724,6 +808,10 @@ async function handleApi(request, response, requestUrl) {
 
           const judgement = await judgeThemeJourney(room.theme, wordsA, wordsB);
           const winnerPlayer = judgement.closer === "tie" ? null : judgement.closer;
+          const chemistry = chemistryPresentation(
+            judgement.chemistry,
+            room.matchNumber * 97 + room.round * 13
+          );
           room.result = {
             round: room.round,
             answers,
@@ -734,6 +822,9 @@ async function handleApi(request, response, requestUrl) {
             winnerPlayer,
             closer: judgement.closer,
             scores: judgement.scores,
+            chemistry: chemistry.score,
+            chemistryLabel: chemistry.label,
+            chemistrySlogan: chemistry.slogan,
             explanation: judgement.explanation,
             judgementSource: judgement.source,
             wordHistory: {

@@ -91,6 +91,10 @@
     winWord: document.getElementById("winWord"),
     winDialogDescription: document.getElementById("winDialogDescription"),
     winVerdict: document.getElementById("winVerdict"),
+    chemistryResult: document.getElementById("chemistryResult"),
+    chemistryScore: document.getElementById("chemistryScore"),
+    chemistryLabel: document.getElementById("chemistryLabel"),
+    chemistrySlogan: document.getElementById("chemistrySlogan"),
     viewWinMatchButton: document.getElementById("viewWinMatchButton"),
     playAgainButton: document.getElementById("playAgainButton"),
     matchDialog: document.getElementById("matchDialog"),
@@ -682,7 +686,10 @@
         " · " +
         match.roundCount +
         " 回合 · " +
-        (match.winnerWord || "未记录");
+        (match.winnerWord || "未记录") +
+        (match.chemistry !== null && match.chemistry !== undefined
+          ? " · 默契度 " + match.chemistry
+          : "");
       badge.textContent = match.mode === "theme" ? "AI 主题" : "默契同词";
       button.type = "button";
       button.textContent = "查看过程";
@@ -879,7 +886,8 @@
         outcome.textContent =
           "公开主题：" + round.theme +
           " · 整局 A " + round.scores.A + " 分 · B " + round.scores.B +
-          " 分 · " + round.explanation;
+          " 分 · 默契度 " + round.chemistry + "「" + round.chemistryLabel +
+          "」· " + round.chemistrySlogan + " · " + round.explanation;
       } else if (round.mode === "theme") {
         outcome.textContent = "本回合双方没有说出同一个词，继续围绕主题联想";
       } else {
@@ -1011,6 +1019,10 @@
       elements.winVerdict.hidden = false;
       elements.winVerdict.textContent =
         "A " + result.scores.A + " 分 · B " + result.scores.B + " 分";
+      elements.chemistryResult.hidden = false;
+      elements.chemistryScore.textContent = String(result.chemistry);
+      elements.chemistryLabel.textContent = result.chemistryLabel;
+      elements.chemistrySlogan.textContent = result.chemistrySlogan;
     } else {
       elements.winDialogKicker.textContent = "YOU THOUGHT THE SAME";
       elements.winDialogTitle.textContent = "想到一起了！";
@@ -1018,6 +1030,10 @@
         "你们在第 " + result.round + " 回合成功想到同一个词「" + result.winner + "」。";
       elements.winVerdict.hidden = true;
       elements.winVerdict.textContent = "";
+      elements.chemistryResult.hidden = true;
+      elements.chemistryScore.textContent = "0";
+      elements.chemistryLabel.textContent = "";
+      elements.chemistrySlogan.textContent = "";
     }
     elements.playAgainButton.disabled = false;
     elements.winDialog.showModal();

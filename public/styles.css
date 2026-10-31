@@ -1606,6 +1606,67 @@ dialog::backdrop {
   font-weight: 800;
 }
 
+.chemistry-result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  max-width: 410px;
+  margin: 1px auto 18px;
+  padding: 13px 15px;
+  border: 1.5px solid var(--ink);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(241, 200, 87, 0.44), transparent 55%),
+    linear-gradient(135deg, #fff9e8, #eaf8f3);
+  box-shadow: 3px 3px 0 rgba(23, 56, 74, 0.12);
+  text-align: left;
+}
+
+.chemistry-number {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--sun);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.chemistry-number strong {
+  font-family: "Courier New", monospace;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.chemistry-number span {
+  margin-top: 3px;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.chemistry-copy {
+  min-width: 0;
+}
+
+.chemistry-copy > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #176f66;
+  font-family: "STSong", "Songti SC", serif;
+  font-size: 17px;
+}
+
+.chemistry-copy p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
 .win-content .dialog-actions {
   max-width: 410px;
   margin: 0 auto;
@@ -2084,6 +2145,15 @@ dialog::backdrop {
 
   .dialog-actions {
     flex-direction: column;
+  }
+
+  .chemistry-result {
+    padding: 11px;
+  }
+
+  .chemistry-number {
+    width: 62px;
+    height: 62px;
   }
 
   .archived-round > div {
