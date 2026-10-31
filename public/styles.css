@@ -1991,6 +1991,11 @@ dialog::backdrop {
     margin-top: 16px;
   }
 
+  .lobby-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
   .room-ticket {
     min-width: 0;
   }

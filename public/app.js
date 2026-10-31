@@ -23,6 +23,7 @@
     roundNumber: document.getElementById("roundNumber"),
     roomCode: document.getElementById("roomCode"),
     copyInviteButton: document.getElementById("copyInviteButton"),
+    returnLobbyButton: document.getElementById("returnLobbyButton"),
     themeCard: document.getElementById("themeCard"),
     themeCategory: document.getElementById("themeCategory"),
     themeClueTitle: document.getElementById("themeClueTitle"),
@@ -139,7 +140,7 @@
 
   function readSession() {
     try {
-      const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
       if (
         saved &&
         typeof saved.roomId === "string" &&
@@ -156,7 +157,7 @@
 
   function writeSession(session) {
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     } catch {
       // 浏览器禁用本地存储时，当前页面仍然可以正常游戏。
     }
@@ -164,6 +165,7 @@
 
   function clearSession() {
     try {
+      sessionStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(SESSION_KEY);
     } catch {
       // 忽略存储权限错误。
@@ -261,6 +263,36 @@
     }
   }
 
+  function returnToLobby() {
+    clearConnection();
+    clearSession();
+    app.session = null;
+    app.room = null;
+    app.chatChannel = "room";
+    app.globalChat = [];
+    app.chatInitialized = {
+      room: false,
+      global: false
+    };
+    app.chatKeys = {
+      room: "",
+      global: ""
+    };
+    app.celebratedRound = null;
+    app.dismissedWinMatchNumber = null;
+    app.lastRound = null;
+    app.lastPhase = null;
+    elements.gameScreen.hidden = true;
+    elements.lobbyScreen.hidden = false;
+    elements.roomCodeInput.value = "";
+    closeRoundDialog();
+    closeWinDialog();
+    closeMatchDialog();
+    document.title = "撞词计划 · 双人在线默契游戏";
+    window.history.replaceState({}, "", "/");
+    setLobbyMessage("已返回大厅，可以创建新房间", false);
+  }
+
   function connectEvents() {
     clearConnection();
     if (!app.session) {
@@ -314,6 +346,8 @@
       global: ""
     };
     app.dismissedWinMatchNumber = null;
+    app.lastRound = null;
+    app.lastPhase = null;
     writeSession(nextSession);
     elements.lobbyScreen.hidden = true;
     elements.gameScreen.hidden = false;
@@ -1306,6 +1340,7 @@
   });
 
   elements.copyInviteButton.addEventListener("click", copyInvite);
+  elements.returnLobbyButton.addEventListener("click", returnToLobby);
   elements.chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
     sendChat();
@@ -1336,14 +1371,25 @@
     await loadHealth();
 
     const saved = readSession();
-    if (saved && (!queryCode || saved.roomId === queryCode)) {
+    const navigationType = performance.getEntriesByType("navigation")[0]?.type || "navigate";
+    const canResumeCurrentPage =
+      saved &&
+      queryCode &&
+      saved.roomId === queryCode &&
+      navigationType === "reload";
+
+    if (canResumeCurrentPage) {
       const restored = await restoreSession(saved);
       if (!restored && queryCode) {
-        setLobbyMessage("上一次的房间已经失效，请重新加入");
+        clearSession();
+        setLobbyMessage("上一房间已经失效，请创建新房间");
       }
     } else if (queryCode) {
+      clearSession();
       setLobbyMessage("输入的房间号已填好，点击加入即可", false);
       elements.joinRoomButton.focus();
+    } else {
+      clearSession();
     }
   }
 
